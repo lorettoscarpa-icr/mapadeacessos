@@ -1,0 +1,148 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gravar Acessos · Loretto Scarpa</title>
+<style>
+  :root{--verde:#2c3318;--gold:#c9a950;--creme:#efe9da;--creme2:#bdb59f;--linha:rgba(201,169,80,.25)}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--verde);color:var(--creme);font-family:system-ui,'Barlow',sans-serif;display:flex;justify-content:center;padding:28px 16px}
+  .wrap{width:100%;max-width:640px}
+  h1{font-family:'Playfair Display',Georgia,serif;font-weight:600;font-size:24px;margin:0 0 4px}
+  .sub{color:var(--creme2);font-size:13px;margin:0 0 22px}
+  .card{background:rgba(255,255,255,.03);border:1px solid var(--linha);border-radius:12px;padding:18px;margin-bottom:16px}
+  label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--creme2);margin-bottom:7px;font-family:'DM Mono',monospace}
+  input,textarea{width:100%;background:rgba(0,0,0,.25);border:1px solid var(--linha);border-radius:8px;color:var(--creme);padding:11px 12px;font-size:14px;font-family:inherit}
+  textarea{min-height:280px;font-family:'DM Mono',ui-monospace,monospace;font-size:12.5px;line-height:1.5;white-space:pre}
+  .row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  button{background:var(--gold);color:#241a00;border:none;border-radius:8px;padding:11px 18px;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit}
+  button.ghost{background:none;color:var(--creme);border:1px solid var(--linha)}
+  button:disabled{opacity:.45;cursor:default}
+  .msg{margin-top:14px;font-size:13.5px;padding:11px 13px;border-radius:8px;display:none}
+  .msg.ok{display:block;background:rgba(120,170,90,.15);border:1px solid rgba(120,170,90,.4)}
+  .msg.err{display:block;background:rgba(200,90,70,.15);border:1px solid rgba(200,90,70,.45)}
+  .who{font-size:12.5px;color:var(--creme2);margin-top:10px}
+  code{color:var(--gold)}
+</style></head>
+<body><div class="wrap">
+  <h1>Gravar lista de acessos</h1>
+  <p class="sub">Cria/atualiza o documento <code>ls_acessos/mapa</code> no Firestore. Edite se quiser antes de gravar.</p>
+
+  <div class="card" id="loginCard">
+    <label>Entrar (use a conta da diretoria)</label>
+    <input id="email" type="email" placeholder="lorettoscarpa@gmail.com" autocomplete="username">
+    <input id="senha" type="password" placeholder="senha" autocomplete="current-password" style="margin-top:10px">
+    <div class="row"><button id="btnLogin">Entrar</button></div>
+    <div class="who" id="who"></div>
+  </div>
+
+  <div class="card">
+    <label>Conteúdo (campo <code>usuarios</code>) — JSON</label>
+    <textarea id="json">{
+  "lorettoscarpa@gmail.com": [
+    "*"
+  ],
+  "larissalorettoscarpa@gmail.com": [
+    "*"
+  ],
+  "jhenniferlorettoscarpa@gmail.com": [
+    "metas",
+    "entregas",
+    "encomendas",
+    "posvenda",
+    "consertos"
+  ],
+  "ialeylorettoscarpa@gmail.com": [
+    "metas",
+    "entregas",
+    "encomendas",
+    "posvenda",
+    "consertos"
+  ],
+  "michellylorettoscarpa@gmail.com": [
+    "metas",
+    "entregas",
+    "encomendas",
+    "posvenda",
+    "consertos"
+  ],
+  "natalialorettoscarpa@gmail.com": [
+    "metas",
+    "entregas",
+    "encomendas",
+    "posvenda",
+    "consertos"
+  ],
+  "yurilorettoscarpa@gmail.com": [
+    "centralestoque",
+    "encomendas",
+    "entregas"
+  ],
+  "edsonlorettoscarpa@gmail.com": [
+    "metas",
+    "entregas",
+    "encomendas",
+    "posvenda",
+    "consertos",
+    "centralestoque"
+  ],
+  "aviaconsultoriaempresarial@gmail.com": [
+    "loretto-icr",
+    "relatoriodevendas",
+    "comissoes",
+    "recursoshumanos"
+  ]
+}</textarea>
+    <div class="row">
+      <button id="btnGravar" disabled>Gravar no Firestore</button>
+      <button id="btnLer" class="ghost" disabled>Ler o que está salvo</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script>
+  const cfg={apiKey:"AIzaSyCogQoTSULCdC1JhTb0IUilWAIA1itBJ8U",authDomain:"loretto-scarpa-l-icr.firebaseapp.com",projectId:"loretto-scarpa-l-icr",storageBucket:"loretto-scarpa-l-icr.firebasestorage.app",messagingSenderId:"428188657366",appId:"1:428188657366:web:258f42f2c0a3813d83cb77"};
+  firebase.initializeApp(cfg);
+  const auth=firebase.auth(), db=firebase.firestore();
+  const $=id=>document.getElementById(id);
+  function msg(t,ok){const m=$('msg');m.textContent=t;m.className='msg '+(ok?'ok':'err');}
+
+  auth.onAuthStateChanged(u=>{
+    const logado=!!u;
+    $('btnGravar').disabled=!logado; $('btnLer').disabled=!logado;
+    $('who').textContent=logado?('Logado como '+u.email):'Não logado.';
+    if(logado){$('loginCard').style.opacity=.7;}
+  });
+
+  $('btnLogin').onclick=async()=>{
+    try{ await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      await auth.signInWithEmailAndPassword($('email').value.trim(), $('senha').value);
+      msg('Login OK.',true);
+    }catch(e){ msg('Falha no login: '+e.message,false); }
+  };
+
+  $('btnGravar').onclick=async()=>{
+    let usuarios;
+    try{ usuarios=JSON.parse($('json').value); }
+    catch(e){ return msg('JSON inválido: '+e.message,false); }
+    try{
+      await db.collection('ls_acessos').doc('mapa').set({
+        atualizado_em:new Date().toISOString().slice(0,10),
+        usuarios
+      });
+      msg('Gravado com sucesso em ls_acessos/mapa ✔',true);
+    }catch(e){ msg('Erro ao gravar (provável regra do Firestore): '+e.message,false); }
+  };
+
+  $('btnLer').onclick=async()=>{
+    try{
+      const s=await db.collection('ls_acessos').doc('mapa').get();
+      if(!s.exists) return msg('Ainda não existe — clique em Gravar para criar.',false);
+      $('json').value=JSON.stringify(s.data().usuarios,null,2);
+      msg('Carregado o que está salvo (atualizado_em: '+(s.data().atualizado_em||'?')+').',true);
+    }catch(e){ msg('Erro ao ler: '+e.message,false); }
+  };
+</script>
+</body></html>
