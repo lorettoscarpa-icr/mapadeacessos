@@ -30,8 +30,9 @@
     <label>Entrar (use a conta da diretoria)</label>
     <input id="email" type="email" placeholder="lorettoscarpa@gmail.com" autocomplete="username">
     <input id="senha" type="password" placeholder="senha" autocomplete="current-password" style="margin-top:10px">
-    <div class="row"><button id="btnLogin">Entrar</button></div>
+    <div class="row"><button id="btnLogin">Entrar</button><button id="btnReset" class="ghost">Esqueci a senha</button></div>
     <div class="who" id="who"></div>
+    <div class="msg" id="msgLogin"></div>
   </div>
 
   <div class="card">
@@ -89,6 +90,9 @@
     "relatoriodevendas",
     "comissoes",
     "recursoshumanos"
+  ],
+  "lorraynelorettoscarpa@gmail.com": [
+    "campanhas"
   ]
 }</textarea>
     <div class="row">
@@ -116,11 +120,30 @@
     if(logado){$('loginCard').style.opacity=.7;}
   });
 
+  function msgLogin(t,ok){const m=$('msgLogin');m.textContent=t;m.className='msg '+(ok?'ok':'err');}
+  function traduzErro(e){
+    const c=(e&&e.code)||'';
+    if(c.includes('invalid-credential')||c.includes('invalid-login')) return 'E-mail ou senha incorretos (a senha é a do Firebase, não a do Gmail).';
+    if(c.includes('wrong-password')) return 'Senha incorreta.';
+    if(c.includes('user-not-found')) return 'Essa conta não existe em Authentication → Users. Crie-a primeiro.';
+    if(c.includes('operation-not-allowed')) return 'Login por E-mail/Senha está DESATIVADO. Ative em Authentication → Sign-in method → Email/Password.';
+    if(c.includes('invalid-email')) return 'E-mail inválido.';
+    if(c.includes('too-many-requests')) return 'Muitas tentativas. Aguarde alguns minutos e tente de novo.';
+    if(c.includes('network')) return 'Falha de rede. Verifique a conexão.';
+    return (e&&e.message)||'Erro desconhecido.';
+  }
   $('btnLogin').onclick=async()=>{
+    msgLogin('Entrando...',true);
     try{ await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
       await auth.signInWithEmailAndPassword($('email').value.trim(), $('senha').value);
-      msg('Login OK.',true);
-    }catch(e){ msg('Falha no login: '+e.message,false); }
+      msgLogin('Login OK ✔',true);
+    }catch(e){ console.warn('login:',e.code,e.message); msgLogin('Falha no login: '+traduzErro(e),false); }
+  };
+  $('btnReset').onclick=async()=>{
+    const em=$('email').value.trim();
+    if(!em) return msgLogin('Digite o e-mail primeiro pra receber o link de redefinição.',false);
+    try{ await auth.sendPasswordResetEmail(em); msgLogin('Enviamos um link de redefinição para '+em+'. Confira a caixa de entrada/spam.',true); }
+    catch(e){ msgLogin('Não foi possível enviar: '+traduzErro(e),false); }
   };
 
   $('btnGravar').onclick=async()=>{
